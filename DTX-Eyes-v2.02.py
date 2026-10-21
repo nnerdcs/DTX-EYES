@@ -1,4 +1,4 @@
-#DTX Eyes v2.02
+#DTX Eyes v2.03
 
 # DTX Eyes - View DTX Files and their headers and convert them to other formats easily.
 # Header reading based off of Five-Damned-Dollarz research as well as the DTXFormat.cpp and dtxmgr_lib.cpp from the source code files.
@@ -8,20 +8,25 @@
 import lzma
 import re
 import argparse
+from PIL import Image
 
 # Run program from command line
 parser = argparse.ArgumentParser(description='Converts DTX files to DDS; handles SPR files and LZMA compression. Written by nnerd.')
-parser.add_argument('input', metavar='input', type=str, help='Input a DDS file or an SPR file path. The DTX files associated with the SPR files must be in the same location as the SPR file.')
+parser.add_argument('input', metavar='input', type=str, help='Input a DDS file or an SPR file path. DTX files associated with the SPR files must be in the same location as the SPR file.')
+parser.add_argument('-tga', action='store_true', help='Convert to TGA after creating DDS files.')
 args = parser.parse_args()
 user_input = args.input
+make_tgas = args.tga
+
 
 class DTX():
 
-    def __init__(self, input_dir,):
+    def __init__(self, input_dir, tga_option):
 
         #The basics
         self.input_dir = input_dir
         self.lzma_compressed = 'No'
+        self.convert_to_tga = tga_option
 
         print('\n')
 
@@ -73,17 +78,19 @@ class DTX():
             spr_dtx_names = []
             idx = 0
             for spr_DTX in spr_content:
-                spr_DTX = str(re.findall(r".*\\\\(.*?)d", spr_content[idx])) #hopefully this works on all sprites.
+                spr_DTX = str(re.findall(r".*\\\\(.*?)dtx", spr_content[idx])) #hopefully this works on all sprites.
                 spr_DTX = (str(spr_DTX))[2:-2:] + 'DTX'
                 spr_dtx_names.append(spr_DTX)
                 idx = idx + 1
+            print(f'Found {len(spr_dtx_names)} DTX files within SPR', *spr_dtx_names, sep='\n')
+
 
             # Recursively convert each DTX file to DDS
-            spr_dtx_destination = (str(re.findall(r"(.+)[/\\]", self.input_dir)))[2:-2:] + '\\' #location from file path without os library lol
+            spr_dtx_destination = (str(re.findall(r"(.+)[/\\]", self.input_dir)))[2:-2:] + '\\' #location from file path
             idx = 0
             for spr_DTX in spr_content:
                 self.dtx_dir = spr_dtx_destination + spr_dtx_names[idx]
-                print('Processing Sprite', idx, self.dtx_dir)
+                print('\nProcessing Sprite', idx, self.dtx_dir)
                 self.handleDTX()
                 idx += 1
             print(f'\nSprite {self.spr_dir} read successfully.')
@@ -134,7 +141,7 @@ class DTX():
     #Convert DTX to DDS
     def convertDTXDDS(self):
 
-        self.dds_dir = self.dtx_dir[:-3] + 'dds'
+        self.dds_dir = self.dtx_dir[:-3] + 'DDS'
 
         with open(self.dtx_dir, "rb") as dtx_file, open(self.dds_dir, "wb") as dds_file:
         #Reset to the first byte of the file just in case.
@@ -191,7 +198,14 @@ class DTX():
             dtx_file.read(164) #Skip the DTX file header
             dds_file.write(dtx_file.read())
 
-            print('Converted', self.dtx_dir, 'to DDS.\n')
+            print('Converted', self.dtx_dir, 'to DDS.')
+
+            # Optional Conversion to TGA
+            if self.convert_to_tga == True:
+                img = Image.open(self.dds_dir)
+                img_name = self.dds_dir[:-3]
+                img.save(f"{img_name}.TGA", compression = None)
+                print('Converted', self.dds_dir, 'to TGA.')
 
 
     # Write any warnings and some of the header info to the console
@@ -231,4 +245,4 @@ class DTX():
             "\nLZMA Compressed File:  ", self.lzma_compressed
         )
 
-DTX(user_input)
+DTX(user_input, make_tgas)
